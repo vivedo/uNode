@@ -1,0 +1,16 @@
+
+# Set flash size to 1MB for the ESP01
+CONFIG_ESPTOOLPY_FLASHSIZE_1MB=y
+
+# Set HTTPD header max length as some browsers send lots of junk in headers
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=768
+
+# Debug level
+# CONFIG_LOG_DEFAULT_LEVEL_NONE is not set
+# CONFIG_LOG_DEFAULT_LEVEL_ERROR is not set
+# CONFIG_LOG_DEFAULT_LEVEL_WARN is not set
+# CONFIG_LOG_DEFAULT_LEVEL_INFO is not set
+CONFIG_LOG_DEFAULT_LEVEL_DEBUG=y
+# CONFIG_LOG_DEFAULT_LEVEL_VERBOSE is not set
+
+CONFIG_LWIP_HIGH_THROUGHPUT=y

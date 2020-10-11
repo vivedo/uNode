@@ -1,0 +1,1 @@
+idf_component_register(SRCS "uNode_main.c" INCLUDE_DIRS "")
