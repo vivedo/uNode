@@ -5,10 +5,10 @@
  */
 
 #include <string.h>
-#include <sys/param.h>
 #include <tcpip_adapter.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "esp_log.h"
 #include "lwip/err.h"
 #include "lwip/sockets.h"
@@ -23,23 +23,23 @@ static TaskHandle_t artnet_server_handle = NULL;
 static void artnet_server_task(void *pvParameters);
 static void process_artnet_packet(artnet_packet_t *packet, universes_t *universes, int socket, struct sockaddr_in *sourceAddr);
 static void fix_artnet_packet(artnet_packet_t *packet);
-static void storeDmxUniverse(artnet_packet_t *packet, uint8_t *universe);
+static void storeDmxUniverse(artnet_packet_t *packet, universe_t *universe);
 static void answerArtPoll(artnet_packet_t *packet, int socket, struct sockaddr_in *sourceAddr);
 
 /**
  * Starts ArtNet listener
  * @param universes
  */
-void start_artnet_server(universes_t *universes) {
+void start_artnet_iface(universes_t *universes) {
 
     if(artnet_server_handle == NULL)
-        xTaskCreate(artnet_server_task, "artnet_server", 4096, universes, 10, &artnet_server_handle);
+        xTaskCreate(artnet_server_task, "artnet_server", 4096, universes, 6, &artnet_server_handle);
 }
 
 /**
  * Stops ArtNet listener
  */
-void stop_artnet_server() {
+void stop_artnet_iface() {
     if(artnet_server_handle != NULL) {
         vTaskDelete(artnet_server_handle);
         artnet_server_handle = NULL;
@@ -77,7 +77,7 @@ static void artnet_server_task(void *pvParameters) {
         ESP_LOGI(TAG, "Socket binded");
 
         for(ever) {
-            ESP_LOGI(TAG, "Waiting for data");
+            //ESP_LOGI(TAG, "Waiting for data");
 
             struct sockaddr_in sourceAddr;
 
@@ -121,17 +121,27 @@ static void process_artnet_packet(artnet_packet_t *packet, universes_t *universe
 
     switch(packet->opcode) {
         case ARTNET_ARTDMX:
-            ESP_LOGI(TAG, "Received ArtDmx (protocol %d) packet of universe %d, size %d", packet->ArtDmx.protocol_version, packet->ArtDmx.universe, packet->ArtDmx.data_length);
+            ESP_LOGV(TAG, "Received ArtDmx (protocol %d) packet of universe %d, size %d", packet->ArtDmx.protocol_version, packet->ArtDmx.universe, packet->ArtDmx.data_length);
 
-            if(packet->ArtDmx.universe == universes->universe_a)
-                storeDmxUniverse(packet, universes->dmx_universe_a);
+            // search for a port that uses the received universe
+            for(uint8_t search = 0; search < UNODE_MAX_UNIVERSES; search++)
+                if(packet->ArtDmx.universe == universes->u[search].universe) {
+                    // if found wait for dmx to use all the old data
+                    xSemaphoreTake(universes->handling.ack, portMAX_DELAY);
 
-            if (packet->ArtDmx.universe == universes->universe_b)
-                storeDmxUniverse(packet, universes->dmx_universe_b);
+                    // store new data
+                    for (uint8_t universe = search; universe < UNODE_MAX_UNIVERSES; universe++)
+                        if (packet->ArtDmx.universe == universes->u[universe].universe)
+                            storeDmxUniverse(packet, &universes->u[universe]);
+
+                    // tell dmx new data is ready
+                    xSemaphoreGive(universes->handling.rdy);
+                    break; // break from search loop
+                }
 
             break;
         case ARTNET_ARTPOLL:
-            ESP_LOGI(TAG, "Received ArtPoll (protocol %d) packet", packet->ArtPoll.protocol_version);
+            ESP_LOGV(TAG, "Received ArtPoll (protocol %d) packet", packet->ArtPoll.protocol_version);
 
             answerArtPoll(packet, socket, sourceAddr);
             break;
@@ -158,10 +168,10 @@ static void fix_artnet_packet(artnet_packet_t *packet) {
  * Copies received ArtDmx packet into a given dmx universe buffer, considering ArtDmx length
  *
  * @param packet received packet
- * @param universe destination universe
+ * @param universes destination universe
  */
-static void storeDmxUniverse(artnet_packet_t *packet, uint8_t *universe) {
-    memcpy(universe, packet->ArtDmx.data, MAX(packet->ArtDmx.data_length, 512));
+static void storeDmxUniverse(artnet_packet_t *packet, universe_t *universe) {
+    memcpy(universe->dmx, packet->ArtDmx.data, packet->ArtDmx.data_length);
 }
 
 /**

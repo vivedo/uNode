@@ -41,9 +41,8 @@ void start_webserver(void) {
         httpd_register_uri_handler(server, &web_dmx_get);
         httpd_register_uri_handler(server, &web_wifi_post);
         httpd_register_uri_handler(server, &web_dmx_post);
-    }
-
-    ESP_LOGD(TAG, "Error starting server!");
+    } else
+        ESP_LOGD(TAG, "Error starting server!");
 }
 
 void stop_webserver(void) {
@@ -148,34 +147,3 @@ static esp_err_t web_dmx_post_handler(httpd_req_t *req) {
 
     return ESP_OK;
 };
-
-// /* An HTTP POST handler */
-//static esp_err_t echo_post_handler(httpd_req_t *req) {
-//    char buf[100];
-//    int ret, remaining = req->content_len;
-//
-//    while (remaining > 0) {
-//        /* Read the data for the request */
-//        if ((ret = httpd_req_recv(req, buf,
-//                                  MIN(remaining, sizeof(buf)))) <= 0) {
-//            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-//                /* Retry receiving if timeout occurred */
-//                continue;
-//            }
-//            return ESP_FAIL;
-//        }
-//
-//        /* Send back the same data */
-//        httpd_resp_send_chunk(req, buf, ret);
-//        remaining -= ret;
-//
-//        /* Log data received */
-//        ESP_LOGD(TAG, "=========== RECEIVED DATA ==========");
-//        ESP_LOGD(TAG, "%.*s", ret, buf);
-//        ESP_LOGD(TAG, "====================================");
-//    }
-//
-//    // End response
-//    httpd_resp_send_chunk(req, NULL, 0);
-//    return ESP_OK;
-//}

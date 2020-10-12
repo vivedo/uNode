@@ -7,6 +7,9 @@
 #ifndef UNODE_DMX_H
 #define UNODE_DMX_H
 
-#define DMX_MAX_CHANNEL 512
+#include "common_dmx.h"
+
+void start_dmx_iface(universes_t *universes);
+void stop_dmx_iface(void);
 
 #endif //UNODE_DMX_H

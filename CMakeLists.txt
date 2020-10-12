@@ -2,6 +2,8 @@
 # CMakeLists in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.5)
 
+set(CMAKE_C_STANDARD 11)
+
 list(APPEND EXTRA_COMPONENT_DIRS "components/softuart" "components/webserver")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)

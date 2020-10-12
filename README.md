@@ -22,7 +22,7 @@ Built on top of [ESP8266 RTOS SDK](https://github.com/espressif/ESP8266_RTOS_SDK
   - [ ] Figuring out how sACN works
   - [ ] Implementing E1.33 for RDM _(?)_
 - [ ] DMX/RDM
-  - [ ] Sending DMX
+  - [x] Sending DMX
   - [ ] ![Low Priority](https://img.shields.io/badge/priority-low-red) Receiving DMX
   - [ ] ![Low Priority](https://img.shields.io/badge/priority-low-red) Sending/receiving RDM
 - [ ] ![Low Priority](https://img.shields.io/badge/priority-low-red) Reverse signal/backup mode
