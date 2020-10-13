@@ -4,25 +4,27 @@
  * This software is distributed under the Simplified BSD License
  */
 
-#include <esp_wifi.h>
-#include <esp_event_loop.h>
-#include <esp_log.h>
-#include <nvs_flash.h>
-#include <webserver.h>
-#include <artnet.h>
-#include <common_dmx.h>
-#include <string.h>
-#include <dmx.h>
+#include "esp_wifi.h"
+#include "esp_event_loop.h"
+#include "esp_log.h"
+#include "nvs_flash.h"
+#include "webserver.h"
+#include "artnet.h"
+#include "common_dmx.h"
+#include "string.h"
+#include "dmx.h"
+#include "datastore.h"
 
 // Contains temporary wifi STA settings, to keep them out of vcs, will be removed wen wifi manager will be implemented
 #include "_tmp_wifi_settings.h" // TODO: remove
 
-static const char *TAG = "main";
+static const char *TAG = "uNode";
 
 universes_t universes;
 
 static void initialise_wifi(void);
 static esp_err_t event_handler(void *ctx, system_event_t *event);
+static void init_dmx_buffers(void);
 static void start_net_functions(void);
 static void stop_net_functions(void);
 
@@ -30,14 +32,10 @@ void app_main() {
     ESP_ERROR_CHECK(nvs_flash_init());
 
     // Init DMX immediately to sendempty universe on DMX
-    universes.u[UNODE_UNIVERSE_A].universe = 0;
-    universes.u[UNODE_UNIVERSE_B].universe = 1;
-    memset(universes.u[UNODE_UNIVERSE_A].dmx, 0x00, DMX_UNIVERSE_SIZE);
-    memset(universes.u[UNODE_UNIVERSE_B].dmx, 0x00, DMX_UNIVERSE_SIZE);
-    universes.handling.ack = xSemaphoreCreateBinary();
-    universes.handling.rdy = xSemaphoreCreateBinary();
+    init_dmx_buffers();
     start_dmx_iface(&universes);
-
+    
+    init_datastore();
 
     initialise_wifi();
 }
@@ -93,6 +91,23 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
             break;
     }
     return ESP_OK;
+}
+
+static void init_dmx_buffers(void) {
+
+    if(get_stored_dmx_config(&universes.settings) != ESP_OK) {
+        universes.settings.port_a_universe = 0;
+        universes.settings.port_b_universe = 1;
+        universes.settings.mode = 0x00; // Mode ArtNet, all output
+        store_dmx_config(&universes.settings);
+    }
+
+    ESP_LOGI(TAG, "Starting with config: A:%u B:%u mode:%u", universes.settings.port_a_universe, universes.settings.port_b_universe, universes.settings.mode);
+
+    memset(universes.buf.a, 0x00, DMX_UNIVERSE_SIZE);
+    memset(universes.buf.b, 0x00, DMX_UNIVERSE_SIZE);
+    universes.handling.ack = xSemaphoreCreateBinary();
+    universes.handling.rdy = xSemaphoreCreateBinary();
 }
 
 static void start_net_functions(void) {

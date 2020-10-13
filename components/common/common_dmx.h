@@ -7,14 +7,17 @@
 #ifndef UNODE_COMMON_DMX_H
 #define UNODE_COMMON_DMX_H
 
-#define UNODE_MAX_UNIVERSES 2
-#define UNODE_UNIVERSE_A 0
-#define UNODE_UNIVERSE_B 1
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 #define DMX_UNIVERSE_SIZE 512
-
 #define DMX_START_CODE 0x00
 #define RDM_START_CODE 0xCC
+
+#define DMX_PROTOCOL_ARTNET 0
+#define DMX_PROTOCOL_SACN 1
+#define DMX_OUTPUT 0
+#define DMX_INPUT 1
 
 typedef struct {
     SemaphoreHandle_t rdy; // new data ready
@@ -22,12 +25,29 @@ typedef struct {
 } universes_handling_t ;
 
 typedef struct {
-    uint16_t universe;
-    uint8_t dmx[DMX_UNIVERSE_SIZE];
-} universe_t;
+    uint16_t port_a_universe;
+    uint16_t port_b_universe;
+
+    union {
+        struct {
+            uint8_t protocol : 1;
+            uint8_t port_a_direction : 1;
+            uint8_t port_b_direction : 1;
+        };
+        uint8_t mode;
+    };
+} dmx_settings_t ;
+
+typedef unsigned char dmx_value_t;
 
 typedef struct {
-    universe_t u[UNODE_MAX_UNIVERSES];
+    dmx_value_t a[DMX_UNIVERSE_SIZE];
+    dmx_value_t b[DMX_UNIVERSE_SIZE];
+} dmx_buffers_t;
+
+typedef struct {
+    dmx_settings_t settings;
+    dmx_buffers_t buf;
     universes_handling_t handling;
 } universes_t;
 

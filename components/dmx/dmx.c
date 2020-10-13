@@ -35,9 +35,10 @@ void start_dmx_iface(universes_t *universes) {
 
     uart_disable_rx_intr(UART_NUM_1);
     uart_driver_install(UART_NUM_1, 0, 0, 0, NULL, 0);
-    uart_write_bytes(UART_NUM_1, "\n\n", 2);
 
-    xTaskCreate(dmx_sender_task, "dmx_sender_task", 1024, universes, 5, NULL);
+    xTaskCreate(dmx_sender_task, "dmx_sender", 1024, universes, 5, NULL);
+
+    ESP_LOGV(TAG, "iface started");
 };
 
 void stop_dmx_iface(void) {
@@ -48,6 +49,8 @@ void stop_dmx_iface(void) {
     dmx_sender_handle = NULL;
 
     uart_driver_delete(UART_NUM_1);
+
+    ESP_LOGV(TAG, "iface stopped");
 };
 
 /**
@@ -56,6 +59,8 @@ void stop_dmx_iface(void) {
  * @param pvParameters
  */
 _Noreturn static void dmx_sender_task(void *pvParameters) {
+    ESP_LOGV(TAG, "dmx_sender_task started");
+
     universes_t *universes = pvParameters;
 
     for(ever) {
@@ -65,16 +70,17 @@ _Noreturn static void dmx_sender_task(void *pvParameters) {
 
         // DMX Packet starts with an >88uS BREAK and an >8uS MAB;
         uart_set_line_inverse(UART_NUM_1, UART_INVERSE_TXD);
-        ets_delay_us(120);
+        ets_delay_us(100);
         uart_set_line_inverse(UART_NUM_1, UART_INVERSE_DISABLE);
-        ets_delay_us(20);
+        ets_delay_us(10);
 
         // Send SC (0x00 for DMX, 0xCC for ArtNet)
         uint8_t DmxStartCode = DMX_START_CODE;
         uart_write_bytes(UART_NUM_1, (const char *) &DmxStartCode, 1);
 
-        uart_write_bytes(UART_NUM_1, (const char *) universes->u[UNODE_UNIVERSE_A].dmx, DMX_UNIVERSE_SIZE);
+        // Send universe
+        uart_write_bytes(UART_NUM_1, (const char *) universes->buf.a, DMX_UNIVERSE_SIZE);
 
-        uart_wait_tx_done(UART_NUM_1, 5 / portTICK_PERIOD_MS);
+        uart_wait_tx_done(UART_NUM_1, 10 / portTICK_PERIOD_MS);
     }
 };

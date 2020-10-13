@@ -5,7 +5,8 @@
  */
 
 #include <string.h>
-#include <tcpip_adapter.h>
+#include "sys/param.h"
+#include "tcpip_adapter.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -23,7 +24,7 @@ static TaskHandle_t artnet_server_handle = NULL;
 static void artnet_server_task(void *pvParameters);
 static void process_artnet_packet(artnet_packet_t *packet, universes_t *universes, int socket, struct sockaddr_in *sourceAddr);
 static void fix_artnet_packet(artnet_packet_t *packet);
-static void storeDmxUniverse(artnet_packet_t *packet, universe_t *universe);
+static void storeDmxUniverse(artnet_packet_t *packet, dmx_value_t *universe);
 static void answerArtPoll(artnet_packet_t *packet, int socket, struct sockaddr_in *sourceAddr);
 
 /**
@@ -31,9 +32,12 @@ static void answerArtPoll(artnet_packet_t *packet, int socket, struct sockaddr_i
  * @param universes
  */
 void start_artnet_iface(universes_t *universes) {
+    if(artnet_server_handle != NULL)
+        return;
 
-    if(artnet_server_handle == NULL)
-        xTaskCreate(artnet_server_task, "artnet_server", 4096, universes, 6, &artnet_server_handle);
+    xTaskCreate(artnet_server_task, "artnet_server", 4096, universes, 6, &artnet_server_handle);
+
+    ESP_LOGI(TAG, "started");
 }
 
 /**
@@ -123,21 +127,21 @@ static void process_artnet_packet(artnet_packet_t *packet, universes_t *universe
         case ARTNET_ARTDMX:
             ESP_LOGV(TAG, "Received ArtDmx (protocol %d) packet of universe %d, size %d", packet->ArtDmx.protocol_version, packet->ArtDmx.universe, packet->ArtDmx.data_length);
 
-            // search for a port that uses the received universe
-            for(uint8_t search = 0; search < UNODE_MAX_UNIVERSES; search++)
-                if(packet->ArtDmx.universe == universes->u[search].universe) {
-                    // if found wait for dmx to use all the old data
-                    xSemaphoreTake(universes->handling.ack, portMAX_DELAY);
+            // if A and B output the same universe use only one buffer, and handle output on 2 port from same buffer in component/dmx
+            if (packet->ArtDmx.universe == universes->settings.port_a_universe &&
+                universes->settings.port_a_direction == DMX_OUTPUT) {
 
-                    // store new data
-                    for (uint8_t universe = search; universe < UNODE_MAX_UNIVERSES; universe++)
-                        if (packet->ArtDmx.universe == universes->u[universe].universe)
-                            storeDmxUniverse(packet, &universes->u[universe]);
+                xSemaphoreTake(universes->handling.ack, portMAX_DELAY);
+                storeDmxUniverse(packet, universes->buf.a);
+                xSemaphoreGive(universes->handling.rdy);
 
-                    // tell dmx new data is ready
-                    xSemaphoreGive(universes->handling.rdy);
-                    break; // break from search loop
-                }
+            } else if (packet->ArtDmx.universe == universes->settings.port_b_universe &&
+                       universes->settings.port_b_direction == DMX_OUTPUT) {
+
+                xSemaphoreTake(universes->handling.ack, portMAX_DELAY);
+                storeDmxUniverse(packet, universes->buf.b);
+                xSemaphoreGive(universes->handling.rdy);
+            }
 
             break;
         case ARTNET_ARTPOLL:
@@ -170,8 +174,8 @@ static void fix_artnet_packet(artnet_packet_t *packet) {
  * @param packet received packet
  * @param universes destination universe
  */
-static void storeDmxUniverse(artnet_packet_t *packet, universe_t *universe) {
-    memcpy(universe->dmx, packet->ArtDmx.data, packet->ArtDmx.data_length);
+static void storeDmxUniverse(artnet_packet_t *packet, dmx_value_t *universe) {
+    memcpy(universe, packet->ArtDmx.data, MIN(packet->ArtDmx.data_length, DMX_UNIVERSE_SIZE));
 }
 
 /**
