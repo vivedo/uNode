@@ -11,6 +11,7 @@ Built on top of [ESP8266 RTOS SDK](https://github.com/espressif/ESP8266_RTOS_SDK
 - [ ] WiFi management (AP/Station mode auto switch)
 - [x] Web config panel
   - [ ] Storing configurations
+  - [x] Captive portal
 - [ ] Handling Art-Net
   - [x] Processing ArtDmx packets
   - [x] Replying to ArtPoll packets

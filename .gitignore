@@ -34,6 +34,3 @@ fabric.properties
 build/
 sdkconfig
 sdkconfig.old
-
-### temp ignores
-main/_tmp_wifi_settings.h

@@ -20,6 +20,7 @@ static esp_err_t web_wifi_get_handler(httpd_req_t *req);
 static esp_err_t web_dmx_get_handler(httpd_req_t *req);
 static esp_err_t web_wifi_post_handler(httpd_req_t *req);
 static esp_err_t web_dmx_post_handler(httpd_req_t *req);
+static esp_err_t web_captive_post_handler(httpd_req_t *req);
 
 static httpd_uri_t web_index_get = { .uri = "/",     .method = HTTP_GET,  .handler = web_index_get_handler, .user_ctx = NULL };
 static httpd_uri_t web_wifi_get  = { .uri = "/wifi", .method = HTTP_GET,  .handler = web_wifi_get_handler,  .user_ctx = NULL };
@@ -27,30 +28,47 @@ static httpd_uri_t web_dmx_get   = { .uri = "/dmx",  .method = HTTP_GET,  .handl
 static httpd_uri_t web_wifi_post = { .uri = "/wifi", .method = HTTP_POST, .handler = web_wifi_post_handler, .user_ctx = NULL };
 static httpd_uri_t web_dmx_post  = { .uri = "/dmx",  .method = HTTP_POST, .handler = web_dmx_post_handler,  .user_ctx = NULL };
 
-static httpd_handle_t server = NULL;
+// endpoints for captive portal detectors
+static httpd_uri_t web_apple_captive  = { .uri = "/hotspot-detect.html", .method = HTTP_GET, .handler = web_captive_post_handler, .user_ctx = NULL };
+static httpd_uri_t web_google_captive = { .uri = "/generate_204",        .method = HTTP_GET, .handler = web_captive_post_handler, .user_ctx = NULL };
+
+static httpd_handle_t server_handle = NULL;
 
 void start_webserver(void) {
+    if(server_handle != NULL)
+        return;
+
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
     ESP_LOGD(TAG, "Starting server on port: '%d'", config.server_port);
-    if (httpd_start(&server, &config) == ESP_OK) {
+    if (httpd_start(&server_handle, &config) == ESP_OK) {
         ESP_LOGD(TAG, "Registering URI handlers");
 
-        httpd_register_uri_handler(server, &web_index_get);
-        httpd_register_uri_handler(server, &web_wifi_get);
-        httpd_register_uri_handler(server, &web_dmx_get);
-        httpd_register_uri_handler(server, &web_wifi_post);
-        httpd_register_uri_handler(server, &web_dmx_post);
+        httpd_register_uri_handler(server_handle, &web_index_get);
+        httpd_register_uri_handler(server_handle, &web_wifi_get);
+        httpd_register_uri_handler(server_handle, &web_dmx_get);
+        httpd_register_uri_handler(server_handle, &web_wifi_post);
+        httpd_register_uri_handler(server_handle, &web_dmx_post);
+
+        httpd_register_uri_handler(server_handle, &web_apple_captive);
+        httpd_register_uri_handler(server_handle, &web_google_captive);
     } else
         ESP_LOGD(TAG, "Error starting server!");
 }
 
 void stop_webserver(void) {
-    httpd_stop(server);
+    if(server_handle == NULL)
+        return;
+
+    httpd_stop(server_handle);
+    server_handle = NULL;
 }
 
 /* GET / handler */
 static esp_err_t web_index_get_handler(httpd_req_t *req) {
+
+    ESP_LOGI(TAG, "%s", req->uri);
+
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     char macStr[18];
@@ -147,3 +165,11 @@ static esp_err_t web_dmx_post_handler(httpd_req_t *req) {
 
     return ESP_OK;
 };
+
+static esp_err_t web_captive_post_handler(httpd_req_t *req) {
+    httpd_resp_set_hdr(req, "Location", "http://unode.vivedo.me/");
+    httpd_resp_set_status(req, "301 Moved Permanently");
+    httpd_resp_send(req, NULL, 0);
+
+    return ESP_OK;
+}

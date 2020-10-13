@@ -44,10 +44,11 @@ void start_artnet_iface(universes_t *universes) {
  * Stops ArtNet listener
  */
 void stop_artnet_iface() {
-    if(artnet_server_handle != NULL) {
-        vTaskDelete(artnet_server_handle);
-        artnet_server_handle = NULL;
-    }
+    if(artnet_server_handle == NULL)
+        return;
+
+    vTaskDelete(artnet_server_handle);
+    artnet_server_handle = NULL;
 }
 
 /**

@@ -21,9 +21,6 @@ static const char *key_b_uni    = "buni";
 static const char *key_mode     = "mode";
 
 void init_datastore(void) {
-    //nvs_flash_init_partition(partition);
-    //nvs_open_from_partition(partition, label, NVS_READWRITE, &handle);
-
     nvs_flash_init();
     nvs_open(label, NVS_READWRITE, &handle);
 
